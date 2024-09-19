@@ -1,14 +1,7 @@
-$tablet: 470px;
 $laptop: 560px;
 
 @mixin min-width($width) {
     @media (min-width: $width) {
-        @content;
-    }
-}
-
-@mixin tablet() {
-    @include min-width($tablet) {
         @content;
     }
 }

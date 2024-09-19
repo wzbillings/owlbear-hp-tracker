@@ -1,17 +1,14 @@
 import { diceTrayModal, diceTrayModalId, modalId } from "../../../helper/variables.ts";
 import OBR from "@owlbear-rodeo/sdk";
-import { updateHp, updateHpOffset } from "../../../helper/hpHelpers.ts";
+import { updateHpOffset } from "../../../helper/hpHelpers.ts";
 import { Groups } from "./Groups.tsx";
 import { Switch } from "../../general/Switch/Switch.tsx";
 import { dndSvg, pfSvg } from "./SwitchBackground.ts";
 import { updateAcOffset } from "../../../helper/acHelper.ts";
 import { useMetadataContext } from "../../../context/MetadataContext.ts";
-import { getRoomDiceUser, updateRoomMetadata } from "../../../helper/helpers.ts";
-import { useTokenListContext } from "../../../context/TokenContext.tsx";
-import { updateTokenMetadata } from "../../../helper/tokenHelper.ts";
+import { updateRoomMetadata } from "../../../helper/helpers.ts";
 
 export const Settings = () => {
-    const tokens = useTokenListContext((state) => state.tokens);
     const [room, scene] = useMetadataContext((state) => [state.room, state.scene]);
 
     const handleOffsetChange = (value: number) => {
@@ -62,43 +59,23 @@ export const Settings = () => {
                         />
                     </div>
                     <div className={"hp-mode setting"}>
-                        <div>
-                            HP Bar Segments:{" "}
-                            <input
-                                type={"text"}
-                                size={2}
-                                value={room?.hpBarSegments || 0}
-                                onChange={(e) => {
-                                    const nValue = Number(e.target.value.replace(/[^0-9]/g, ""));
-                                    updateRoomMetadata(room, { hpBarSegments: nValue });
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "ArrowUp") {
-                                        updateRoomMetadata(room, { hpBarSegments: (room?.hpBarSegments || 0) + 1 });
-                                    } else if (e.key === "ArrowDown") {
-                                        updateRoomMetadata(room, { hpBarSegments: (room?.hpBarSegments || 0) + -1 });
-                                    }
-                                }}
-                            />
-                        </div>
-                        <div>
-                            Disable HP Bar:
-                            <input
-                                type={"checkbox"}
-                                checked={!!room?.disableHpBar}
-                                onChange={async () => {
-                                    await updateRoomMetadata(room, { disableHpBar: !room?.disableHpBar });
-                                    tokens?.forEach((token) => {
-                                        const data = {
-                                            ...token.data,
-                                            hpBar: token.data.hpOnMap && !!room?.disableHpBar,
-                                        };
-                                        updateTokenMetadata(data, [token.item.id]);
-                                        updateHp(token.item, data);
-                                    });
-                                }}
-                            />
-                        </div>
+                        HP Bar Segments:{" "}
+                        <input
+                            type={"text"}
+                            size={2}
+                            value={room?.hpBarSegments || 0}
+                            onChange={(e) => {
+                                const nValue = Number(e.target.value.replace(/[^0-9]/g, ""));
+                                updateRoomMetadata(room, { hpBarSegments: nValue });
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === "ArrowUp") {
+                                    updateRoomMetadata(room, { hpBarSegments: (room?.hpBarSegments || 0) + 1 });
+                                } else if (e.key === "ArrowDown") {
+                                    updateRoomMetadata(room, { hpBarSegments: (room?.hpBarSegments || 0) + -1 });
+                                }
+                            }}
+                        />
                     </div>
                     <div className={"hp-position setting"}>
                         Text and Bar Offset:{" "}
@@ -113,16 +90,16 @@ export const Settings = () => {
                                 if (factor < 0 && nValue === 0) {
                                     e.currentTarget.value = "-";
                                 } else {
-                                    e.currentTarget.value = String(nValue * factor);
+                                    e.currentTarget.value = (nValue * factor).toString();
                                 }
                             }}
                             onKeyDown={(e) => {
                                 if (e.key === "ArrowUp") {
                                     handleOffsetChange((room?.hpBarOffset || 0) + 1);
-                                    e.currentTarget.value = String((room?.hpBarOffset || 0) + 1);
+                                    e.currentTarget.value = ((room?.hpBarOffset || 0) + 1).toString();
                                 } else if (e.key === "ArrowDown") {
                                     handleOffsetChange((room?.hpBarOffset || 0) - 1);
-                                    e.currentTarget.value = String((room?.hpBarOffset || 0) + 1);
+                                    e.currentTarget.value = ((room?.hpBarOffset || 0) + 1).toString();
                                 }
                             }}
                         />
@@ -162,15 +139,7 @@ export const Settings = () => {
                                 const disableDiceRoller = !room?.disableDiceRoller;
                                 await updateRoomMetadata(room, { disableDiceRoller: disableDiceRoller });
                                 if (!disableDiceRoller) {
-                                    const diceRoomUser = getRoomDiceUser(room, OBR.player.id);
-                                    if (diceRoomUser) {
-                                        await OBR.modal.open({
-                                            ...diceTrayModal,
-                                            url: `https://dddice.com/room/${room.diceRoom!.slug}/stream?key=${
-                                                diceRoomUser.apiKey
-                                            }`,
-                                        });
-                                    }
+                                    await OBR.modal.open(diceTrayModal);
                                 } else {
                                     await OBR.modal.close(diceTrayModalId);
                                 }
@@ -188,7 +157,7 @@ export const Settings = () => {
                         />
                     </div>
                     <div className={"player-sort setting"}>
-                        Sort Tokens by Initiative for Players:
+                        Sort Tokens in Player View:
                         <input
                             type={"checkbox"}
                             checked={room?.playerSort || false}
@@ -224,7 +193,7 @@ export const Settings = () => {
                                         },
                                     });
 
-                                    e.currentTarget.value = String(Math.max(200, parseInt(e.currentTarget.value)));
+                                    e.currentTarget.value = Math.max(200, parseInt(e.currentTarget.value)).toString();
                                 }}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") {
@@ -234,7 +203,10 @@ export const Settings = () => {
                                                 width: Math.max(parseInt(e.currentTarget.value), 200),
                                             },
                                         });
-                                        e.currentTarget.value = String(Math.max(200, parseInt(e.currentTarget.value)));
+                                        e.currentTarget.value = Math.max(
+                                            200,
+                                            parseInt(e.currentTarget.value)
+                                        ).toString();
                                     }
                                 }}
                             />
@@ -251,7 +223,7 @@ export const Settings = () => {
                                             height: Math.max(parseInt(e.currentTarget.value), 200),
                                         },
                                     });
-                                    e.currentTarget.value = String(Math.max(200, parseInt(e.target.value)));
+                                    e.currentTarget.value = Math.max(200, parseInt(e.target.value)).toString();
                                 }}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") {
@@ -261,7 +233,10 @@ export const Settings = () => {
                                                 height: Math.max(parseInt(e.currentTarget.value), 200),
                                             },
                                         });
-                                        e.currentTarget.value = String(Math.max(200, parseInt(e.currentTarget.value)));
+                                        e.currentTarget.value = Math.max(
+                                            200,
+                                            parseInt(e.currentTarget.value)
+                                        ).toString();
                                     }
                                 }}
                             />

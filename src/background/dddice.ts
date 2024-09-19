@@ -7,7 +7,6 @@ import { ThreeDDiceAPI } from "dddice-js";
 import {
     addRollerApiCallbacks,
     blastMessage,
-    connectToDddiceRoom,
     dddiceApiLogin,
     handleNewRoll,
     removeRollerApiCallbacks,
@@ -17,7 +16,7 @@ import { RollLogEntryType, rollLogStore } from "../context/RollLogContext.tsx";
 import { diceRollerStore } from "../context/DDDiceContext.tsx";
 
 const lock = new AsyncLock();
-const diceRollerState: { diceUser: DiceUser | null; disableDiceRoller: boolean; diceRoom?: string } = {
+const diceRollerState: { diceUser: DiceUser | null; disableDiceRoller: boolean } = {
     diceUser: null,
     disableDiceRoller: false,
 };
@@ -37,7 +36,6 @@ const initDice = async (room: RoomMetadata, updateApi: boolean) => {
     }
 
     if (diceRollerState.diceUser?.diceRendering && !diceRollerStore.getState().dddiceExtensionLoaded) {
-        await OBR.modal.close(diceTrayModalId);
         await OBR.modal.open({
             ...diceTrayModal,
             url: `https://dddice.com/room/${room.diceRoom!.slug}/stream?key=${diceRollerState.diceUser.apiKey}`,
@@ -94,15 +92,7 @@ const roomCallback = async (metadata: Metadata, forceLogin: boolean) => {
             }
         }
         if (reInitialize || !initialized) {
-            await initDiceRoller(roomData, forceLogin);
-        }
-
-        diceRollerState.diceRoom = roomData.diceRoom?.slug;
-    } else if (diceRollerState.diceRoom !== roomData?.diceRoom?.slug) {
-        const api = diceRollerStore.getState().rollerApi;
-        if (api && roomData?.diceRoom?.slug) {
-            diceRollerState.diceRoom = roomData.diceRoom.slug;
-            await connectToDddiceRoom(api, roomData);
+            await initDiceRoller(roomData, forceLogin || false);
         }
     }
     lock.disable(null);
@@ -122,7 +112,7 @@ export const setupDddice = async () => {
         try {
             if (event.type === "message") {
                 if (event.data.type === "roll:finished") {
-                    await rollerCallback(event.data.roll, rollLogStore.getState().addRoll);
+                    await rollerCallback(event.data.roll, rollLogStore.getState().addRoll, true);
                 }
                 if (event.data.type === "dddice.loaded") {
                     diceRollerStore.getState().setDddiceExtensionLoaded(true);
@@ -132,5 +122,5 @@ export const setupDddice = async () => {
         } catch {}
     });
     blastMessage({ type: "dddice.isLoaded" });
-    console.info("GM's Grimoire - Finished setting up dddice");
+    console.info("HP Tracker - Finished setting up dddice");
 };

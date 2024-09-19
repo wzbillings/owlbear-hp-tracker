@@ -33,7 +33,6 @@ export const createAC = async (ac: number, token: Image) => {
         .disableAttachmentBehavior(["VISIBLE", "ROTATION"])
         .visible(token.visible)
         .locked(true)
-        .disableHit(true)
         .attachedTo(token.id)
         .build();
 
@@ -44,13 +43,12 @@ export const createAC = async (ac: number, token: Image) => {
         .position({ x: position.x, y: position.y + height * 0.2 })
         .attachedTo(acShape.id)
         .locked(true)
-        .plainText(String(ac))
+        .plainText(ac.toString())
         .textAlign("CENTER")
         .fontSize(width / 2)
         .strokeColor("black")
         .strokeWidth(2)
         .fontWeight(600)
-        .disableHit(true)
         .textAlignVertical("MIDDLE")
         .visible(token.visible)
         .build();
@@ -81,7 +79,7 @@ const handleACOffsetUpdate = async (offset: { x: number; y: number }, ac: Item) 
 
 export const updateAcOffset = async (offset: { x: number; y: number }) => {
     const acCurves = await OBR.scene.items.getItems(
-        (item) => item.type === "CURVE" && infoMetadataKey in item.metadata,
+        (item) => item.type === "CURVE" && infoMetadataKey in item.metadata
     );
     const changeMap = new Map<string, ACItemChanges>();
     for (const acCurve of acCurves) {
@@ -96,13 +94,17 @@ export const updateAc = async (token: Item, data: HpTrackerMetadata) => {
     const acAttachment = (await getAttachedItems(token.id, ["CURVE"])).filter((a) => attachmentFilter(a, "AC"));
 
     const show = data.acOnMap && data.hpTrackerActive;
-    const visible = !!data.playerMap?.ac && token.visible;
+    const visible = data.canPlayersSee && token.visible;
     if (!show) {
         await deleteAttachments(acAttachment);
     } else {
-        const changes = new Map<string, ACItemChanges>();
-        await saveOrChangeAC(token, data, acAttachment, changes, visible);
-        await updateAcChanges(changes);
+        const characters = await OBR.scene.items.getItems([token.id]);
+        if (characters.length > 0) {
+            const character = characters[0];
+            const changes = new Map<string, ACItemChanges>();
+            await saveOrChangeAC(character, data, acAttachment, changes, visible);
+            await updateAcChanges(changes);
+        }
     }
 };
 
@@ -124,7 +126,7 @@ export const updateAcChanges = async (changes: Map<string, ACItemChanges>) => {
                         }
                     }
                 });
-            },
+            }
         );
         await OBR.scene.items.updateItems(
             (item): item is Text => isText(item) && changes.has(item.id),
@@ -137,7 +139,7 @@ export const updateAcChanges = async (changes: Map<string, ACItemChanges>) => {
                         }
                     }
                 });
-            },
+            }
         );
     }
 };
@@ -147,7 +149,7 @@ export const saveOrChangeAC = async (
     data: HpTrackerMetadata,
     attachments: Item[],
     changeMap: Map<string, ACItemChanges>,
-    visible: boolean,
+    visible: boolean
 ) => {
     if (attachments.length > 0) {
         for (const a of attachments) {
@@ -160,9 +162,9 @@ export const saveOrChangeAC = async (
             texts.forEach((text) => {
                 if (text.type === "TEXT") {
                     const t = text as Text;
-                    if (t.text.plainText !== String(data.armorClass)) {
+                    if (t.text.plainText !== data.armorClass.toString()) {
                         const textChange = changeMap.get(t.id) ?? {};
-                        textChange.text = String(data.armorClass);
+                        textChange.text = data.armorClass.toString();
                         changeMap.set(t.id, textChange);
                     }
                 }
@@ -183,8 +185,8 @@ export const updateAcVisibility = async (tokens: Array<Item>) => {
 
         acAttachments.forEach((curve) => {
             const change = acChanges.get(curve.id) ?? {};
-            if (curve.visible != (token.visible && !!data.playerMap?.ac)) {
-                change.visible = token.visible && !!data.playerMap?.ac;
+            if (curve.visible != (token.visible && data.canPlayersSee)) {
+                change.visible = token.visible && data.canPlayersSee;
                 acChanges.set(curve.id, change);
             }
         });

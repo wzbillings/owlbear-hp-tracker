@@ -2,13 +2,11 @@
 import remarkGfm from "remark-gfm";
 import { generateSlug } from "../../helper/helpers.ts";
 import ReactMarkdown from "react-markdown";
-import rehypeRaw from "rehype-raw";
 
 export const Markdown = ({ text }: { text: string }) => {
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
             components={{
                 h1: ({ node, ...props }) => (
                     <h1
@@ -28,14 +26,12 @@ export const Markdown = ({ text }: { text: string }) => {
                         {...props}
                     ></h3>
                 ),
-                h4: ({ node, ...props }) => {
-                    return (
-                        <h4
-                            id={generateSlug(typeof props.children === "string" ? props.children : props.children[0])}
-                            {...props}
-                        ></h4>
-                    );
-                },
+                h4: ({ node, ...props }) => (
+                    <h4
+                        id={generateSlug(typeof props.children === "string" ? props.children : props.children[0])}
+                        {...props}
+                    ></h4>
+                ),
                 h5: ({ node, ...props }) => (
                     <h5
                         id={generateSlug(typeof props.children === "string" ? props.children : props.children[0])}

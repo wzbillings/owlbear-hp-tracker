@@ -1,6 +1,6 @@
 import { RoomMetadata } from "./types.ts";
 import { dddiceRollToRollLog, updateRoomMetadata } from "./helpers.ts";
-import OBR, { Metadata } from "@owlbear-rodeo/sdk";
+import OBR from "@owlbear-rodeo/sdk";
 import {
     IAvailableDie,
     IDiceRoll,
@@ -8,7 +8,6 @@ import {
     IDieType,
     IRoll,
     IRoom,
-    IRoomParticipant,
     ITheme,
     IUser,
     Operator,
@@ -21,7 +20,6 @@ import { rollLogPopover, rollLogPopoverId, rollMessageChannel } from "./variable
 import { DiceRoll } from "@dice-roller/rpg-dice-roller";
 import { v4 } from "uuid";
 import { diceRollerStore } from "../context/DDDiceContext.tsx";
-import { CustomDieNotation, diceButtonsStore } from "../context/DiceButtonContext.tsx";
 
 let rollLogTimeOut: number;
 
@@ -72,19 +70,13 @@ export const updateRoomMetadataDiceUser = async (
 };
 
 export const updateRoomMetadataDiceRoom = async (room: RoomMetadata, slug: string | undefined) => {
-    // to keep in sync with dddice I save the dddice metadata as well (Approved by CelesteBloodreign)
-    const dddiceMetadata: Metadata = {};
-    dddiceMetadata["com.dddice/roomSlug"] = slug;
-    await updateRoomMetadata(
-        room,
-        {
-            diceRoom: {
-                slug: slug,
-            },
+    await updateRoomMetadata(room, {
+        diceRoom: {
+            slug: slug,
         },
-        dddiceMetadata
-    );
+    });
 };
+
 export const getDiceUser = async (rollerApi: ThreeDDiceAPI) => {
     return (await rollerApi?.user.get())?.data;
 };
@@ -115,7 +107,7 @@ export const getApiKey = async (room: RoomMetadata | null) => {
     }
 
     if (!apiKey) {
-        apiKey = (await new ThreeDDiceAPI(undefined, "GM's Grimoire").user.guest()).data;
+        apiKey = (await new ThreeDDiceAPI(undefined, "HP Tracker").user.guest()).data;
         updateKey = true;
     }
 
@@ -126,11 +118,7 @@ export const getApiKey = async (room: RoomMetadata | null) => {
     return apiKey;
 };
 
-export const getDiceRoom = async (
-    rollerApi: ThreeDDiceAPI,
-    room: RoomMetadata | null,
-    diceRoom?: IRoom
-): Promise<IRoom | undefined> => {
+export const getDiceRoom = async (rollerApi: ThreeDDiceAPI, room: RoomMetadata | null): Promise<IRoom | undefined> => {
     const roomMetadata = await OBR.room.getMetadata();
     let slug: string | undefined;
 
@@ -138,10 +126,6 @@ export const getDiceRoom = async (
         slug = roomMetadata["com.dddice/roomSlug"] as string;
     } else {
         slug = room?.diceRoom?.slug;
-    }
-
-    if (diceRoom && diceRoom.slug === slug) {
-        return diceRoom;
     }
 
     if (!slug) {
@@ -159,17 +143,14 @@ export const getDiceRoom = async (
                 await updateRoomMetadataDiceRoom(room, diceRoom.slug);
                 return diceRoom;
             }
-        } catch (e) {
-            // @ts-ignore
-            if (e.response.status === 404) {
-                // it seems like a room with no logged in users is removed after some time, so in that case we need to create a new one
-                const newDiceRoom = (await rollerApi?.room.create())?.data;
-                if (room && newDiceRoom) {
-                    await updateRoomMetadataDiceRoom(room, newDiceRoom.slug);
-                    return newDiceRoom;
-                } else {
-                    console.warn("GM's Grimoire - unable to connect to dddice room");
-                }
+        } catch {
+            // it seems like a room with no logged in users is removed after some time, so in that case we need to create a new one
+            const newDiceRoom = (await rollerApi?.room.create())?.data;
+            if (room && newDiceRoom) {
+                await updateRoomMetadataDiceRoom(room, newDiceRoom.slug);
+                return newDiceRoom;
+            } else {
+                console.warn("HP Tracker - unable to connect to dddice room");
             }
         }
 
@@ -177,13 +158,9 @@ export const getDiceRoom = async (
     }
 };
 
-export const prepareRoomUser = async (diceRoom: IRoom, rollerApi: ThreeDDiceAPI, user: IUser) => {
-    const participant = await getDiceParticipant(rollerApi, diceRoom.slug, user);
+export const prepareRoomUser = async (diceRoom: IRoom, rollerApi: ThreeDDiceAPI) => {
+    const participant = await getDiceParticipant(rollerApi, diceRoom.slug);
     const name = await OBR.player.getName();
-
-    if (participant) {
-        setCustomDiceButtons(participant);
-    }
 
     if (participant && participant.username !== name) {
         await rollerApi.room.updateParticipant(diceRoom.slug, participant.id, {
@@ -206,16 +183,14 @@ export const handleNewRoll = async (addRoll: (entry: RollLogEntryType) => void, 
     }, 7500);
 };
 
-export const rollerCallback = async (e: IRoll, addRoll: (entry: RollLogEntryType) => void) => {
-    const participant = e.room.participants.find((p) => p.user.uuid === e.user.uuid);
+export const rollerCallback = async (e: IRoll, addRoll: (entry: RollLogEntryType) => void, show: boolean = false) => {
+    // we only handle new rolls dddice extension is not loaded or the function is called directly from the dddice callback (show = true)
+    if (!diceRollerStore.getState().dddiceExtensionLoaded || show) {
+        const participant = e.room.participants.find((p) => p.user.uuid === e.user.uuid);
 
-    const rollLogEntry = await dddiceRollToRollLog(e, { participant: participant });
+        const rollLogEntry = await dddiceRollToRollLog(e, { participant: participant });
 
-    // we only handle new rolls dddice extension is not loaded
-    if (!diceRollerStore.getState().dddiceExtensionLoaded) {
         await handleNewRoll(addRoll, rollLogEntry);
-    } else {
-        addRoll(rollLogEntry);
     }
 };
 
@@ -227,52 +202,20 @@ export const removeRollerApiCallbacks = async () => {
     // TODO: dddice sdk does not provide this function yet
 };
 
-const setCustomDiceButtons = (participant: IRoomParticipant) => {
-    const validDice = ["d2", "d4", "d6", "d8", "d10", "d12", "d16", "d20"];
-    const diceButtons = diceButtonsStore.getState().buttons;
-    let count = 1;
-    participant.dice_tray.forEach((dice_array) => {
-        dice_array.forEach((d) => {
-            if (count <= 8) {
-                // @ts-ignore
-                const currentCustomDice: CustomDieNotation = diceButtons[String(count)];
-                if (d && validDice.includes(d.dieType) && currentCustomDice === null) {
-                    // @ts-ignore
-                    diceButtons[String(count)] = { dice: `1${d.dieType}`, theme: d.theme };
-                    count++;
-                }
-            }
-        });
-    });
-    diceButtonsStore.getState().setButtons(diceButtons);
-};
-
-export const dddiceApiLogin = async (room: RoomMetadata | null, user?: IUser) => {
-    const rollerApi = new ThreeDDiceAPI(await getApiKey(room), "GM's Grimoire");
-    return connectToDddiceRoom(rollerApi, room, user);
-};
-
-export const connectToDddiceRoom = async (
-    api: ThreeDDiceAPI,
-    room: RoomMetadata | null,
-    user?: IUser,
-    currentDiceRoom?: IRoom
-) => {
-    const diceRoom = await getDiceRoom(api, room, currentDiceRoom);
+export const dddiceApiLogin = async (room: RoomMetadata | null) => {
+    const rollerApi = new ThreeDDiceAPI(await getApiKey(room), "HP Tracker");
+    const diceRoom = await getDiceRoom(rollerApi, room);
     if (diceRoom) {
-        let diceUser: IUser | undefined = user;
-        if (!diceUser) {
-            diceUser = (await api.user.get())?.data;
-        }
-        if (diceUser) {
-            const participant = diceRoom.participants.find((p) => p.user.uuid === diceUser.uuid);
+        const user = (await rollerApi.user.get())?.data;
+        if (user) {
+            const participant = diceRoom.participants.find((p) => p.user.uuid === user.uuid);
             if (participant) {
-                await prepareRoomUser(diceRoom, api, diceUser);
+                await prepareRoomUser(diceRoom, rollerApi);
             } else {
                 try {
-                    const userDiceRoom = (await api?.room.join(diceRoom.slug, diceRoom.passcode))?.data;
+                    const userDiceRoom = (await rollerApi?.room.join(diceRoom.slug, diceRoom.passcode))?.data;
                     if (userDiceRoom) {
-                        await prepareRoomUser(userDiceRoom, api, diceUser);
+                        await prepareRoomUser(userDiceRoom, rollerApi);
                     }
                 } catch (e) {
                     console.warn(e);
@@ -283,7 +226,7 @@ export const connectToDddiceRoom = async (
                      */
                 }
             }
-            return api.connect(diceRoom.slug, diceRoom.passcode, diceUser.uuid);
+            return rollerApi.connect(diceRoom.slug, diceRoom.passcode, user.uuid);
         }
     }
 };
@@ -389,8 +332,7 @@ export const localRoll = async (
             created_at: new Date().toISOString(),
             equation: diceEquation,
             label: label,
-            is_hidden: false,
-            total_value: String(roll.total),
+            total_value: roll.total.toString(),
             username: statblock ?? name,
             values: [roll.output.substring(roll.output.indexOf(":") + 1, roll.output.indexOf("=") - 1)],
             owlbear_user_id: OBR.player.id,

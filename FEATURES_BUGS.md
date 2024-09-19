@@ -3,15 +3,14 @@
 ## Bugs
 
 + When flipping a Token the Shapes and Texts need to be toggled to be in the right position
-qq
+
 ## Feature Ideas
 
-+ Effect tracking
-+ Show Initiative in Player Action Window 
-(https://discord.com/channels/1214184454244007976/1214184455023886401/1284004476348399718)
-+ Show hidden Items in player action window (https://discord.com/channels/1214184454244007976/1214185336935161876/1283983107070099468) 
-+ Stopping a Battle resets the initiative (https://discord.com/channels/1214184454244007976/1214204559820464159/1284140469387001918)
-+ Add statblocks to multiple tokens at once (https://discord.com/channels/1214184454244007976/1214185336935161876/1284936982471901264)
++ Battleround and Effect tracking
++ Handle Token Ownership
++ Allow statblocks to be hidden from statblock popover
++ Allow dddice user to switch rooms
++ Add customization to HP Bar settings
 + Pagination for statblocks
 + add Items to statblocks
 + Add default settings for Visibility Buttons

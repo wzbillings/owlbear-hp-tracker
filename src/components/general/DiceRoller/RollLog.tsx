@@ -1,10 +1,10 @@
 import { DiceButton } from "./DiceButtonWrapper.tsx";
 import { RollLogEntryType, useRollLogContext } from "../../../context/RollLogContext.tsx";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useInterval } from "../../../helper/hooks.ts";
 import { usePlayerContext } from "../../../context/PlayerContext.ts";
+import tippy from "tippy.js";
 import { isObject } from "lodash";
-import Tippy from "@tippyjs/react";
 
 type RollLogEntryProps = {
     entry: RollLogEntryType;
@@ -43,10 +43,8 @@ export const RollLogEntry = (props: RollLogEntryProps) => {
     const playerContext = usePlayerContext();
     const rollTime = new Date(props.entry.created_at);
     const now = new Date();
-    const [hidden, setHidden] = useState<boolean>(props.entry.is_hidden);
+    const detailsRef = useRef<HTMLDivElement>(null);
 
-    const ownRoll =
-        props.entry.owlbear_user_id === playerContext.id || props.entry.participantUsername === playerContext.name;
     const deltaTime = now.getTime() - rollTime.getTime();
 
     const getRollTimeText = (delta: number) => {
@@ -77,6 +75,12 @@ export const RollLogEntry = (props: RollLogEntryProps) => {
         setRollTimeText(getRollTimeText(nowTime.getTime() - rollTime.getTime()));
     }, 60000);
 
+    useEffect(() => {
+        if (detailsRef.current) {
+            tippy(detailsRef.current, { content: getDetailedResult(), maxWidth: "100vw" });
+        }
+    }, [detailsRef]);
+
     const getDetailedResult = useCallback(() => {
         if (
             props.entry.values.length > 0 &&
@@ -84,20 +88,12 @@ export const RollLogEntry = (props: RollLogEntryProps) => {
             // @ts-ignore before the switch values had the property "value"
             props.entry.values[0].hasOwnProperty("value")
         ) {
-            return (
-                props.entry.values
-                    // @ts-ignore before the switch values had the property "value"
-                    .map((v) => (hidden ? "?" : v.value))
-                    .join(", ")
-                    .replace(", +", " + ")
-            );
+            // @ts-ignore before the switch values had the property "value"
+            return props.entry.values.map((v) => v.value).join(", ");
         } else {
-            return props.entry.values
-                .map((v) => (hidden ? "?" : v))
-                .join(", ")
-                .replaceAll(", +", " + ");
+            return props.entry.values.join(", ");
         }
-    }, [props.entry.values, hidden]);
+    }, [props.entry.values]);
 
     const formatLabel = useCallback(() => {
         if (props.entry.label) {
@@ -120,7 +116,14 @@ export const RollLogEntry = (props: RollLogEntryProps) => {
     }, [props.entry.label]);
 
     return (
-        <li className={`roll-log-entry ${props.classes} ${ownRoll ? "self" : ""}`}>
+        <li
+            className={`roll-log-entry ${props.classes} ${
+                props.entry.owlbear_user_id === playerContext.id ||
+                props.entry.participantUsername === playerContext.name
+                    ? "self"
+                    : ""
+            }`}
+        >
             <div className={"roll-time"}>{rollTimeText}</div>
             <div className={"roll-context"}>{formatLabel()}</div>
             <div className={"username"}>{props.entry.username}</div>
@@ -131,21 +134,11 @@ export const RollLogEntry = (props: RollLogEntryProps) => {
                 statblock={props.entry.username}
             />
             <div className={"roll-equation"}>{props.entry.equation}</div>
-            <Tippy content={getDetailedResult()} maxWidth={"100vw"}>
-                <div className={"detailed-result"}>{getDetailedResult()}</div>
-            </Tippy>
+            <div ref={detailsRef} className={"detailed-result"}>
+                {getDetailedResult()}
+            </div>
             <div className={"divider"}>=</div>
-            <div className={"total"}>{hidden ? "?" : String(props.entry.total_value)}</div>
-            {props.entry.is_hidden && ownRoll ? (
-                <button
-                    className={"hide-toggle"}
-                    onClick={() => {
-                        setHidden(!hidden);
-                    }}
-                >
-                    {hidden ? "unhide" : "hide"}
-                </button>
-            ) : null}
+            <div className={"total"}>{props.entry.total_value.toString()}</div>
         </li>
     );
 };

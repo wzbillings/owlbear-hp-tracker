@@ -52,8 +52,8 @@ export interface paths {
     get: operations["list_statblocks_api_v1_users_me_statblocks_get"];
   };
   "/api/v1/users/me/spells": {
-    /** List Spells */
-    get: operations["list_spells_api_v1_users_me_spells_get"];
+    /** List Statblocks */
+    get: operations["list_statblocks_api_v1_users_me_spells_get"];
   };
   "/api/v1/users/change-password": {
     /** Change Password */
@@ -62,12 +62,6 @@ export interface paths {
   "/api/v1/users/activate": {
     /** Activate User */
     post: operations["activate_user_api_v1_users_activate_post"];
-  };
-  "/api/v1/users/me/settings": {
-    /** Get User Settings */
-    get: operations["get_user_settings_api_v1_users_me_settings_get"];
-    /** Put User Settings */
-    put: operations["put_user_settings_api_v1_users_me_settings_put"];
   };
   "/api/v1/pf/statblock/": {
     /** List Pf Statblocks */
@@ -385,10 +379,6 @@ export interface components {
        * @default []
        */
       spells?: string[];
-      /** Spell Dc */
-      spell_dc?: string | null;
-      /** Spell Attack */
-      spell_attack?: string | null;
       /**
        * Limits
        * @default []
@@ -498,10 +488,6 @@ export interface components {
        * @default []
        */
       spells?: components["schemas"]["src__types__e5__Spell"][];
-      /** Spell Dc */
-      spell_dc?: string | null;
-      /** Spell Attack */
-      spell_attack?: string | null;
       /**
        * Limits
        * @default []
@@ -742,25 +728,6 @@ export interface components {
       /** Critical Failure */
       critical_failure?: string | null;
       limit?: components["schemas"]["LimitedUse"] | null;
-    };
-    /** Settings */
-    Settings: {
-      /**
-       * Crit Rules
-       * @default none
-       * @enum {string}
-       */
-      crit_rules?: "none" | "double_dice" | "double_role" | "max_roll";
-      /**
-       * Death Saves
-       * @default false
-       */
-      death_saves?: boolean;
-      /**
-       * Gm Rolls Hidden
-       * @default false
-       */
-      gm_rolls_hidden?: boolean;
     };
     /** Skill */
     Skill: {
@@ -1072,11 +1039,8 @@ export interface components {
        * @default
        */
       desc?: string | null;
-      /**
-       * Higher Level
-       * @default
-       */
-      higher_level?: string | null;
+      /** Higher Level */
+      higher_level: string;
       /** Range */
       range: string;
       /** Verbal */
@@ -1097,10 +1061,6 @@ export interface components {
       casting_time: string;
       /** Level */
       level: number;
-      /** Is Attack */
-      is_attack?: boolean | null;
-      /** Dc */
-      dc?: string | null;
       school: components["schemas"]["SpellSchool"];
       /**
        * Classes
@@ -1133,11 +1093,8 @@ export interface components {
        * @default
        */
       desc?: string | null;
-      /**
-       * Higher Level
-       * @default
-       */
-      higher_level?: string | null;
+      /** Higher Level */
+      higher_level: string;
       /** Range */
       range: string;
       /** Verbal */
@@ -1158,10 +1115,6 @@ export interface components {
       casting_time: string;
       /** Level */
       level: number;
-      /** Is Attack */
-      is_attack?: boolean | null;
-      /** Dc */
-      dc?: string | null;
       /** School */
       school: string;
       /**
@@ -1619,8 +1572,8 @@ export interface operations {
       };
     };
   };
-  /** List Spells */
-  list_spells_api_v1_users_me_spells_get: {
+  /** List Statblocks */
+  list_statblocks_api_v1_users_me_spells_get: {
     responses: {
       /** @description Successful Response */
       200: {
@@ -1659,39 +1612,6 @@ export interface operations {
       200: {
         content: {
           "application/json": unknown;
-        };
-      };
-    };
-  };
-  /** Get User Settings */
-  get_user_settings_api_v1_users_me_settings_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
-  /** Put User Settings */
-  put_user_settings_api_v1_users_me_settings_put: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Settings"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

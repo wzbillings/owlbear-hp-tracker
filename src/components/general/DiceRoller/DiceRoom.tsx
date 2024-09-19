@@ -7,17 +7,32 @@ import OBR from "@owlbear-rodeo/sdk";
 import { diceModal } from "../../../helper/variables.ts";
 import { DiceRoomButtons } from "./DiceRoomButtons.tsx";
 import { CopySvg } from "../../svgs/CopySvg.tsx";
+import { useDiceRoller } from "../../../context/DDDiceContext.tsx";
+import { getDiceUser } from "../../../helper/diceHelper.ts";
 import { IUser } from "dddice-js";
 import { usePlayerContext } from "../../../context/PlayerContext.ts";
 import { updateRoomMetadata } from "../../../helper/helpers.ts";
 
-export const DiceRoom = ({ className, user }: { className?: string; user?: IUser }) => {
+export const DiceRoom = ({ className }: { className?: string }) => {
     const room = useMetadataContext((state) => state.room);
     const clear = useRollLogContext((state) => state.clear);
-
+    const rollerApi = useDiceRoller((state) => state.rollerApi);
     const [settings, setSettings] = useState<boolean>(false);
     const [open, setOpen] = useState<boolean>(false);
+    const [user, setUser] = useState<IUser>();
     const playerContext = usePlayerContext();
+
+    useEffect(() => {
+        const initUser = async () => {
+            if (rollerApi) {
+                const user = await getDiceUser(rollerApi);
+                if (user) {
+                    setUser(user);
+                }
+            }
+        };
+        initUser();
+    }, [rollerApi]);
 
     useEffect(() => {
         if (!open) {

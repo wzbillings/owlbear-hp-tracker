@@ -1,17 +1,17 @@
 import { ReactElement, useEffect, useRef, useState } from "react";
 import { useCharSheet } from "../../../context/CharacterContext.ts";
-import OBR, { Image } from "@owlbear-rodeo/sdk";
-import { settingsModal } from "../../../helper/variables.ts";
+import OBR, { Item } from "@owlbear-rodeo/sdk";
+import { itemMetadataKey, settingsModal } from "../../../helper/variables.ts";
 import { HpTrackerMetadata, Ruleset } from "../../../helper/types.ts";
 import { usePlayerContext } from "../../../context/PlayerContext.ts";
 import { SearchResult5e, SearchResultPf } from "./SearchResult.tsx";
 import { Statblock } from "./Statblock.tsx";
+import { Helpbuttons } from "../../general/Helpbuttons/Helpbuttons.tsx";
 import { useMetadataContext } from "../../../context/MetadataContext.ts";
-import { getSearchString, getTokenName, updateRoomMetadata } from "../../../helper/helpers.ts";
-import { useTokenListContext } from "../../../context/TokenContext.tsx";
+import { updateRoomMetadata } from "../../../helper/helpers.ts";
 
 type SearchWrapperProps = {
-    name: string;
+    data: HpTrackerMetadata;
     setSearch: (search: string) => void;
     setForceSearch: (force: boolean) => void;
     empty: boolean;
@@ -24,7 +24,15 @@ type StatblockWrapperProps = {
     search: string;
     itemId: string;
     setEmpty: (empty: boolean) => void;
-    setScrollTargets: (targets: Array<{ name: string; target: string }>) => void;
+};
+
+const getSearchString = (name: string): string => {
+    const nameParts = name.split(" ");
+    const lastToken = nameParts[nameParts.length - 1];
+    if (lastToken.length < 3 || /^\d+$/.test(lastToken) || /\d/.test(lastToken)) {
+        return nameParts.slice(0, nameParts.length - 1).join(" ");
+    }
+    return name;
 };
 
 const SearchWrapper = (props: SearchWrapperProps) => {
@@ -41,7 +49,7 @@ const SearchWrapper = (props: SearchWrapperProps) => {
                         <div className={"custom-statblock-wrapper"}>
                             To create custom statblocks go to{" "}
                             <a href={"https://tabletop-almanac.com"} target={"_blank"}>
-                                Tabletop Almanac
+                                Tabletop Alamanc
                             </a>{" "}
                             and enter you API Key here:
                             <input
@@ -62,7 +70,7 @@ const SearchWrapper = (props: SearchWrapperProps) => {
                                     ? "No results for this input, try another name"
                                     : "Enter the name of the creature you're searching"
                             }
-                            defaultValue={getSearchString(props.name)}
+                            defaultValue={getSearchString(props.data.name)}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                     props.setSearch(e.currentTarget.value);
@@ -114,7 +122,7 @@ const StatblockWrapper = (props: StatblockWrapperProps) => {
     return (
         <>
             {props.data.sheet && !props.forceSearch ? (
-                <Statblock id={props.itemId} setScrollTargets={props.setScrollTargets} />
+                <Statblock data={props.data} itemId={props.itemId} />
             ) : props.search !== "" ? (
                 ruleSetMap.get(room?.ruleset || "e5")
             ) : (
@@ -125,33 +133,46 @@ const StatblockWrapper = (props: StatblockWrapperProps) => {
 };
 
 export const CharacterSheet = (props: { itemId: string }) => {
-    const { setId } = useCharSheet();
-    const playerContext = usePlayerContext();
+    const { characterId, setId } = useCharSheet();
     const room = useMetadataContext((state) => state.room);
-    const token = useTokenListContext((state) => state.tokens?.get(props.itemId));
-    const item = token?.item as Image;
-    const data = token?.data as HpTrackerMetadata;
+    const [token, setToken] = useState<Item | null>(null);
+    const [data, setData] = useState<HpTrackerMetadata | null>(null);
     const [search, setSearch] = useState<string>("");
     const [forceSearch, setForceSearch] = useState<boolean>(false);
     const [emptySearch, setEmptySearch] = useState<boolean>(false);
-    const [backgroundColor, setBackgroundColor] = useState<string>();
-    const [scrollTargets, setScrollTargets] = useState<Array<{ name: string; target: string }>>([]);
-    const [stickHeight, setStickyHeight] = useState<number>();
-    const jumpLinksRef = useRef<HTMLUListElement>(null);
 
-    const initData = async () => {
-        if (playerContext.role !== "GM" && item.createdUserId === OBR.player.id) {
-            setBackgroundColor(await OBR.player.getColor());
+    const initData = (items: Item[]) => {
+        if (items.length > 0) {
+            const item = items[0];
+            if (itemMetadataKey in item.metadata) {
+                const d = item.metadata[itemMetadataKey] as HpTrackerMetadata;
+                setData(d);
+                if (!d.sheet) {
+                    setSearch(getSearchString(d.name));
+                }
+                setToken(item);
+            }
         }
     };
 
     useEffect(() => {
-        if (item) {
-            initData();
-        } else {
-            setId(null);
-        }
-    }, [item]);
+        const getToken = async () => {
+            if (characterId) {
+                const items = await OBR.scene.items.getItems([characterId]);
+
+                initData(items);
+            }
+        };
+
+        getToken();
+    }, [characterId]);
+
+    useEffect(() => {
+        OBR.scene.items.onChange(async (items) => {
+            const filteredItems = items.filter((item) => item.id === characterId);
+            initData(filteredItems);
+        });
+    }, []);
 
     useEffect(() => {
         if (data?.sheet && data?.ruleset === room?.ruleset) {
@@ -161,43 +182,21 @@ export const CharacterSheet = (props: { itemId: string }) => {
         }
     }, [data?.sheet]);
 
-    useEffect(() => {
-        if(jumpLinksRef.current){
-            setTimeout(() => {
-                setStickyHeight(jumpLinksRef.current?.clientHeight);
-            }, 1000)
-        }
-
-    }, [jumpLinksRef.current]);
-
     return (
-        <div className={`character-sheet`} style={{['--sticky-height' as string]: `${stickHeight}px` }}>
-            {backgroundColor ? (
-                <div className={"background"} style={{ borderLeft: `5px solid ${backgroundColor}` }}></div>
-            ) : null}
+        <div className={"character-sheet"}>
             <button className={"back-button"} onClick={() => setId(null)}>
                 Back
             </button>
-            {item && data ? (
+            <Helpbuttons />
+            {token && data ? (
                 <div className={"content"}>
-                    <div className={"statblock-top"}>
-                        <h2 className={"statblock-name"}>
-                            {getTokenName(item)} <span className={"note"}>(using {room?.ruleset} Filter)</span>
-                        </h2>
-                        <ul className={"jump-links"} ref={jumpLinksRef}>
-                            {scrollTargets.map((t) => {
-                                return (
-                                    <li className={"button"} key={t.name}>
-                                        <a href={`#${t.target}`}>{t.name}</a>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
+                    <h2>
+                        {data.name} <span className={"note"}>(using {room?.ruleset} Filter)</span>
+                    </h2>
                     {room?.ruleset === "e5" || room?.ruleset === "pf" ? (
                         <>
                             <SearchWrapper
-                                name={getTokenName(item)}
+                                data={data}
                                 setSearch={setSearch}
                                 setForceSearch={setForceSearch}
                                 empty={emptySearch}
@@ -209,7 +208,6 @@ export const CharacterSheet = (props: { itemId: string }) => {
                                 setForceSearch={setForceSearch}
                                 itemId={props.itemId}
                                 setEmpty={setEmptySearch}
-                                setScrollTargets={setScrollTargets}
                             />
                         </>
                     ) : (

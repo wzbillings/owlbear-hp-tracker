@@ -17,12 +17,12 @@ import diff_match_patch from "./diff/diff_match_patch.ts";
 import { E5Statblock } from "../api/e5/useE5Api.ts";
 import { PfStatblock } from "../api/pf/usePfApi.ts";
 import axiosRetry from "axios-retry";
-import { Ability } from "../components/hptracker/charactersheet/e5/E5Ability.tsx";
+import { Ability } from "../components/hptracker/charactersheet/E5Ability.tsx";
 
 export const getYOffset = async (height: number) => {
     const metadata = (await OBR.room.getMetadata()) as Metadata;
     const roomMetadata = metadata[metadataKey] as RoomMetadata;
-    let offset = roomMetadata ? (roomMetadata.hpBarOffset ?? 0) : 0;
+    let offset = roomMetadata ? roomMetadata.hpBarOffset ?? 0 : 0;
     const offsetFactor = height / 150;
     offset *= offsetFactor;
     return offset;
@@ -31,7 +31,7 @@ export const getYOffset = async (height: number) => {
 export const getACOffset = async (height: number, width: number) => {
     const metadata = (await OBR.room.getMetadata()) as Metadata;
     const roomMetadata = metadata[metadataKey] as RoomMetadata;
-    let offset = roomMetadata ? (roomMetadata.acOffset ?? { x: 0, y: 0 }) : { x: 0, y: 0 };
+    let offset = roomMetadata ? roomMetadata.acOffset ?? { x: 0, y: 0 } : { x: 0, y: 0 };
     offset.x = offset.x * (width / 150);
     offset.y = offset.y * (height / 150);
     return offset;
@@ -53,7 +53,7 @@ export const getAttachedItems = async (id: string, itemTypes: Array<string>) => 
 export const calculatePercentage = async (data: HpTrackerMetadata) => {
     const metadata = (await OBR.room.getMetadata()) as Metadata;
     const roomMetadata = metadata[metadataKey] as RoomMetadata;
-    const segments = roomMetadata ? (roomMetadata.hpBarSegments ?? 0) : 0;
+    const segments = roomMetadata ? roomMetadata.hpBarSegments ?? 0 : 0;
 
     const tempHp = data.stats.tempHp ?? 0;
 
@@ -205,7 +205,7 @@ export const updateSceneMetadata = async (scene: SceneMetadata | null, data: Par
 export const updateRoomMetadata = async (
     room: RoomMetadata | null,
     data: Partial<RoomMetadata>,
-    additionalData?: Metadata,
+    additionalData?: Metadata
 ) => {
     const ownMetadata: Metadata = additionalData ?? {};
     ownMetadata[metadataKey] = { ...room, ...data };
@@ -217,7 +217,7 @@ export const updateRoomMetadata = async (
 
 export const dddiceRollToRollLog = async (
     roll: IRoll,
-    options?: { participant?: IRoomParticipant; owlbear_user_id?: string },
+    options?: { participant?: IRoomParticipant; owlbear_user_id?: string }
 ): Promise<RollLogEntryType> => {
     let username = roll.external_id ?? roll.user.username;
     let participantName = "";
@@ -239,16 +239,9 @@ export const dddiceRollToRollLog = async (
         created_at: roll.created_at,
         equation: roll.equation,
         label: roll.label,
-        is_hidden: roll.values.some((v) => v.is_hidden),
         total_value: roll.total_value,
         username: username,
-        values: roll.values.map((v) => {
-            if (v.is_user_value) {
-                return `+${String(v.value)}`;
-            } else {
-                return String(v.value);
-            }
-        }),
+        values: roll.values.map((v) => v.value.toString()),
         owlbear_user_id: options?.owlbear_user_id,
         participantUsername: participantName,
     };
@@ -304,8 +297,7 @@ const getLimitsE5 = (statblock: E5Statblock) => {
 };
 
 const getLimitsPf = (statblock: PfStatblock) => {
-    if (!statblock) {
-    }
+    console.log(statblock);
     return [];
 };
 
@@ -340,16 +332,7 @@ export const updateTokenSheet = (statblock: E5Statblock | PfStatblock, character
     });
 };
 
-export const getSearchString = (name: string): string => {
-    const nameParts = name.split(" ");
-    const lastToken = nameParts[nameParts.length - 1];
-    if (lastToken.length < 3 || /^\d+$/.test(lastToken) || /\d/.test(lastToken)) {
-        return nameParts.slice(0, nameParts.length - 1).join(" ");
-    }
-    return name;
-};
-
-export const getInitialValues = async (items: Array<Image>) => {
+export const getInitialValues = async (items: Array<Item>) => {
     const roomData = await OBR.room.getMetadata();
     let ruleset = "e5";
     let apiKey = undefined;
@@ -369,7 +352,6 @@ export const getInitialValues = async (items: Array<Image>) => {
 
     for (const item of items) {
         try {
-            const name = getSearchString(getTokenName(item));
             if (!(itemMetadataKey in item.metadata)) {
                 if (ruleset === "e5") {
                     const statblocks = await axios.request({
@@ -377,7 +359,7 @@ export const getInitialValues = async (items: Array<Image>) => {
                         method: "GET",
                         headers: headers,
                         params: {
-                            name: name,
+                            name: item.name,
                             take: 20,
                             skip: 0,
                         },
@@ -385,7 +367,7 @@ export const getInitialValues = async (items: Array<Image>) => {
                     let bestMatch: { distance: number; statblock: InitialStatblockData } | undefined = undefined;
                     const diff = new diff_match_patch();
                     statblocks.data.forEach((statblock: E5Statblock) => {
-                        const d = diff.diff_main(statblock.name, name);
+                        const d = diff.diff_main(statblock.name, item.name);
                         const dist = diff.diff_levenshtein(d);
                         if (
                             bestMatch === undefined ||
@@ -415,7 +397,7 @@ export const getInitialValues = async (items: Array<Image>) => {
                         method: "GET",
                         headers: headers,
                         params: {
-                            name: name,
+                            name: item.name,
                             take: 10,
                             skip: 0,
                         },
@@ -423,7 +405,7 @@ export const getInitialValues = async (items: Array<Image>) => {
                     let bestMatch: { distance: number; statblock: InitialStatblockData } | undefined = undefined;
                     const diff = new diff_match_patch();
                     statblocks.data.forEach((statblock: PfStatblock) => {
-                        const d = diff.diff_main(statblock.name, name);
+                        const d = diff.diff_main(statblock.name, item.name);
                         const dist = diff.diff_levenshtein(d);
                         if (bestMatch === undefined || dist < bestMatch.distance) {
                             bestMatch = {
@@ -434,8 +416,8 @@ export const getInitialValues = async (items: Array<Image>) => {
                                     bonus: statblock.perception
                                         ? parseInt(statblock.perception)
                                         : statblock.skills && "perception" in statblock.skills
-                                          ? parseInt(statblock.skills["perception"] as string)
-                                          : 0,
+                                        ? parseInt(statblock.skills["perception"] as string)
+                                        : 0,
                                     slug: statblock.slug,
                                     ruleset: "pf",
                                     limits: getLimitsPf(statblock),
@@ -456,85 +438,23 @@ export const getInitialValues = async (items: Array<Image>) => {
 };
 
 export const updateLimit = async (itemId: string, limitValues: Limit) => {
-    if (limitValues) {
-        await OBR.scene.items.updateItems([itemId], (items) => {
-            items.forEach((item) => {
-                if (item) {
-                    const metadata = item.metadata[itemMetadataKey] as HpTrackerMetadata;
-                    if (metadata) {
-                        const index = metadata.stats.limits?.findIndex((l) => {
-                            return l.id === limitValues.id;
-                        });
-                        if (index !== undefined) {
-                            // @ts-ignore
-                            item.metadata[itemMetadataKey]["stats"]["limits"][index]["used"] = Math.min(
-                                limitValues.used + 1,
-                                limitValues.max,
-                            );
-                        }
+    await OBR.scene.items.updateItems([itemId], (items) => {
+        items.forEach((item) => {
+            if (item) {
+                const metadata = item.metadata[itemMetadataKey] as HpTrackerMetadata;
+                if (metadata) {
+                    const index = metadata.stats.limits?.findIndex((l) => {
+                        return l.id === limitValues.id;
+                    });
+                    if (index !== undefined) {
+                        // @ts-ignore
+                        item.metadata[itemMetadataKey]["stats"]["limits"][index]["used"] = Math.min(
+                            limitValues.used + 1,
+                            limitValues.max
+                        );
                     }
                 }
-            });
-        });
-    }
-};
-
-export const getTokenName = (token: Image) => {
-    try {
-        if (token.text && token.text.plainText && token.text.plainText.replaceAll(" ", "").length > 0) {
-            return token.text.plainText;
-        } else {
-            return token.name;
-        }
-    } catch {
-        return "";
-    }
-};
-
-export const prepareTokenForGrimoire = async (contextItems: Array<Image>) => {
-    const tokenIds: Array<string> = [];
-    const itemStatblocks = await getInitialValues(contextItems as Array<Image>);
-    await OBR.scene.items.updateItems(contextItems, (items) => {
-        items.forEach((item) => {
-            tokenIds.push(item.id);
-            if (itemMetadataKey in item.metadata) {
-                const metadata = item.metadata[itemMetadataKey] as HpTrackerMetadata;
-                metadata.hpTrackerActive = true;
-                item.metadata[itemMetadataKey] = metadata;
-            } else {
-                // variable allows us to be typesafe
-                const defaultMetadata: HpTrackerMetadata = {
-                    hp: 0,
-                    maxHp: 0,
-                    armorClass: 0,
-                    hpTrackerActive: true,
-                    hpOnMap: false,
-                    acOnMap: false,
-                    hpBar: false,
-                    initiative: 0,
-                    sheet: "",
-                    stats: {
-                        initiativeBonus: 0,
-                        initial: true,
-                    },
-                    playerMap: {
-                        hp: false,
-                        ac: false,
-                    },
-                };
-                if (item.id in itemStatblocks) {
-                    defaultMetadata.sheet = itemStatblocks[item.id].slug;
-                    defaultMetadata.ruleset = itemStatblocks[item.id].ruleset;
-                    defaultMetadata.maxHp = itemStatblocks[item.id].hp;
-                    defaultMetadata.hp = itemStatblocks[item.id].hp;
-                    defaultMetadata.armorClass = itemStatblocks[item.id].ac;
-                    defaultMetadata.stats.initiativeBonus = itemStatblocks[item.id].bonus;
-                    defaultMetadata.stats.initial = true;
-                    defaultMetadata.stats.limits = itemStatblocks[item.id].limits;
-                }
-                item.metadata[itemMetadataKey] = defaultMetadata;
             }
         });
     });
-    return tokenIds;
 };

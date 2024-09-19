@@ -1,19 +1,16 @@
 import { useDiceRoller } from "../../../context/DDDiceContext.tsx";
-import { CustomDieNotation, useDiceButtonsContext } from "../../../context/DiceButtonContext.tsx";
+import { useDiceButtonsContext } from "../../../context/DiceButtonContext.tsx";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { IAvailableDie, IDiceRoll, IDieType, ITheme, Operator, parseRollEquation } from "dddice-js";
+import { IAvailableDie, IDiceRoll, IDieType, Operator, parseRollEquation } from "dddice-js";
 import { DiceSvg } from "../../svgs/DiceSvg.tsx";
 import { AddSvg } from "../../svgs/AddSvg.tsx";
 import { diceToRoll, getUserUuid, localRoll, rollWrapper } from "../../../helper/diceHelper.ts";
+import tippy, { Instance } from "tippy.js";
 import { RollLogSvg } from "../../svgs/RollLogSvg.tsx";
 import { useMetadataContext } from "../../../context/MetadataContext.ts";
 import { useRollLogContext } from "../../../context/RollLogContext.tsx";
 import { DiceRoll } from "@dice-roller/rpg-dice-roller";
-import { getDiceImage, getSvgForDiceType, getThemePreview } from "../../../helper/previewHelpers.tsx";
-import { Select } from "../Select.tsx";
-import { isNull, isString } from "lodash";
-import Tippy from "@tippyjs/react";
-import { usePlayerContext } from "../../../context/PlayerContext.ts";
+import { getDiceImage, getSvgForDiceType } from "../../../helper/previewHelpers.tsx";
 
 type DiceRoomButtonsProps = {
     open: boolean;
@@ -22,49 +19,46 @@ type DiceRoomButtonsProps = {
 
 type CustomDiceButtonProps = {
     button: number;
-    customDice: CustomDieNotation | null;
+    dice: string | null;
 };
 
+// this is here and not in diceHelper.ts because it needs to be in a .tsx file
+
 const CustomDiceButton = (props: CustomDiceButtonProps) => {
-    const [rollerApi, theme, initialized, themes] = useDiceRoller((state) => [
-        state.rollerApi,
-        state.theme,
-        state.initialized,
-        state.themes,
-    ]);
+    const [rollerApi, theme, initialized] = useDiceRoller((state) => [state.rollerApi, state.theme, state.initialized]);
     const addRoll = useRollLogContext((state) => state.addRoll);
     const { buttons, setButtons } = useDiceButtonsContext();
-    const [room, taSettings] = useMetadataContext((state) => [state.room, state.taSettings]);
+    const room = useMetadataContext((state) => state.room);
     const [hover, setHover] = useState<boolean>(false);
     const [addCustom, setAddCustom] = useState<boolean>(false);
     const [validCustom, setValidCustom] = useState<boolean>(false);
-    const [currentCustomTheme, setCurrentCustomTheme] = useState<ITheme | null>(theme);
+    const [tippyInstance, setTippyInstance] = useState<Instance>();
+    const buttonRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const playerContext = usePlayerContext();
-    const defaultHidden = playerContext.role === "GM" && !!taSettings.gm_rolls_hidden;
 
     useEffect(() => {
-        setCurrentCustomTheme(theme);
-    }, [theme]);
-
-    const setCustomTheme = (themeId: string) => {
-        if (!isNull(themes)) {
-            const tempT = themes.find((t) => t.id === themeId);
-            if (tempT) {
-                setCurrentCustomTheme(tempT);
+        if (buttonRef.current) {
+            if (!tippyInstance) {
+                setTippyInstance(
+                    tippy(buttonRef.current, {
+                        content: props.dice || "Add new custom dice roll",
+                    })
+                );
+            } else {
+                tippyInstance.setContent(props.dice || "Add new custom dice roll");
             }
         }
-    };
+    }, [props.dice]);
 
     const getDicePreview = useCallback(() => {
-        if (props.customDice && theme && !room?.disableDiceRoller) {
+        if (props.dice && theme && !room?.disableDiceRoller) {
             try {
-                const parsed = parseRollEquation(props.customDice.dice, props.customDice.theme ?? theme.id);
+                const parsed = parseRollEquation(props.dice, theme.id);
                 return (
                     <div className={"custom-dice-preview-wrapper"}>
                         {parsed.dice.map((die, index) => {
                             if (die.type !== "mod") {
-                                const preview = getDiceImage(theme, die, index, props.customDice?.theme, themes);
+                                const preview = getDiceImage(theme, die, index);
                                 if (preview) {
                                     return preview;
                                 }
@@ -99,53 +93,48 @@ const CustomDiceButton = (props: CustomDiceButtonProps) => {
             } catch {
                 return <DiceSvg />;
             }
-        } else if (props.customDice) {
-            try {
-                const parsed = parseRollEquation(props.customDice.dice, props.customDice.theme ?? "dddice-bees");
-                return (
-                    <div className={"custom-dice-preview-wrapper"}>
-                        {parsed.dice.map((die, index) => {
-                            if (die.type !== "mod") {
+        } else if (props.dice) {
+            const parsed = parseRollEquation(props.dice, "dddice-bees");
+            return (
+                <div className={"custom-dice-preview-wrapper"}>
+                    {parsed.dice.map((die, index) => {
+                        if (die.type !== "mod") {
+                            return (
+                                <div key={index} className={"preview-image"}>
+                                    {getSvgForDiceType(die.type)}
+                                </div>
+                            );
+                        } else {
+                            if (die.value) {
                                 return (
-                                    <div key={index} className={"preview-image"}>
-                                        {getSvgForDiceType(die.type)}
-                                    </div>
+                                    <span key={index} className={"modifier"}>
+                                        {Intl.NumberFormat("en-US", { signDisplay: "always" }).format(die.value)}
+                                    </span>
                                 );
-                            } else {
-                                if (die.value) {
-                                    return (
-                                        <span key={index} className={"modifier"}>
-                                            {Intl.NumberFormat("en-US", { signDisplay: "always" }).format(die.value)}
-                                        </span>
-                                    );
-                                }
                             }
-                        })}
-                    </div>
-                );
-            } catch {
-                return <DiceSvg />;
-            }
+                        }
+                    })}
+                </div>
+            );
         }
         return <DiceSvg />;
-    }, [theme, props.customDice, room?.disableDiceRoller, themes, rollerApi]);
+    }, [theme, props.dice, room?.disableDiceRoller]);
 
-    const roll = async (button: HTMLButtonElement, hide: boolean = false) => {
+    const roll = async (button: HTMLButtonElement) => {
         button.classList.add("rolling");
-        if (!room?.disableDiceRoller && rollerApi && theme && props.customDice) {
+        if (!room?.disableDiceRoller && rollerApi && theme && props.dice) {
             let parsed: { dice: IDiceRoll[]; operator: Operator | undefined } | undefined = diceToRoll(
-                props.customDice.dice,
-                props.customDice.theme ?? theme.id,
+                props.dice,
+                theme.id
             );
             if (parsed) {
                 await rollWrapper(rollerApi, parsed.dice, {
                     operator: parsed.operator,
                     label: "Roll: Custom",
-                    whisper: hide ? await getUserUuid(room, rollerApi) : undefined,
                 });
             }
-        } else if (props.customDice) {
-            await localRoll(props.customDice.dice, "Roll: Custom", addRoll, hide);
+        } else if (props.dice) {
+            await localRoll(props.dice, "Roll: Custom", addRoll);
         }
         button.classList.remove("rolling");
         button.blur();
@@ -157,170 +146,105 @@ const CustomDiceButton = (props: CustomDiceButtonProps) => {
 
     return (
         <div
-            className={`custom-dice-wrapper ${props.customDice && !props.customDice.removed ? "has-dice" : ""}`}
+            className={`custom-dice-wrapper ${props.dice ? "has-dice" : ""}`}
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
         >
-            <Tippy
-                content={
-                    props.customDice && !props.customDice.removed ? props.customDice.dice : "Add new custom dice roll"
-                }
+            <button
+                ref={buttonRef}
+                className={`button custom-dice dice-${props.button} ${isEnabled() ? "enabled" : "disabled"} `}
+                onClick={async (e) => {
+                    if (!props.dice && buttons.hasOwnProperty(props.button.toString())) {
+                        setAddCustom(true);
+                    } else if (props.dice) {
+                        await roll(e.currentTarget);
+                    }
+                }}
             >
+                {props.dice ? getDicePreview() : <AddSvg />}
+            </button>
+            {addCustom ? (
+                <div className={"add-custom-dice"}>
+                    <input
+                        ref={inputRef}
+                        type={"text"}
+                        onChange={(e) => {
+                            const value = e.currentTarget.value;
+                            try {
+                                if (theme) {
+                                    const parsed = parseRollEquation(value, theme);
+                                    if (parsed) {
+                                        setValidCustom(true);
+                                        inputRef.current?.classList.remove("error");
+                                        inputRef.current?.classList.add("success");
+                                    }
+                                } else {
+                                    const roll = new DiceRoll(value);
+                                    if (roll) {
+                                        setValidCustom(true);
+                                        inputRef.current?.classList.remove("error");
+                                        inputRef.current?.classList.add("success");
+                                    }
+                                }
+                            } catch {
+                                setValidCustom(false);
+                                inputRef.current?.classList.remove("success");
+                                inputRef.current?.classList.add("error");
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && validCustom) {
+                                const newButton = {
+                                    [props.button]: e.currentTarget.value,
+                                };
+                                setButtons(newButton);
+                                setAddCustom(false);
+                                setValidCustom(false);
+                            } else if (e.key === "Escape") {
+                                setAddCustom(false);
+                            }
+                        }}
+                    />
+                    <button
+                        className={"save-custom-dice"}
+                        disabled={!validCustom}
+                        onClick={() => {
+                            if (inputRef.current) {
+                                const newButton = {
+                                    [props.button]: inputRef.current.value,
+                                };
+                                setButtons(newButton);
+                                setAddCustom(false);
+                                setValidCustom(false);
+                            }
+                        }}
+                    >
+                        √
+                    </button>
+                    <button
+                        className={"abort-custom-dice"}
+                        onClick={() => {
+                            setAddCustom(false);
+                        }}
+                    >
+                        X
+                    </button>
+                </div>
+            ) : null}
+            {props.dice ? (
                 <button
-                    className={`button custom-dice dice-${props.button} ${isEnabled() ? "enabled" : "disabled"} ${
-                        addCustom ? "open" : ""
-                    }`}
-                    onClick={async (e) => {
-                        if (
-                            (!props.customDice || props.customDice.removed) &&
-                            buttons.hasOwnProperty(String(props.button))
-                        ) {
-                            setAddCustom(true);
-                        } else if (props.customDice && !props.customDice.removed) {
-                            await roll(e.currentTarget, defaultHidden);
+                    className={`remove-dice ${hover ? "hover" : ""}`}
+                    onClick={() => {
+                        if (props.dice && buttons.hasOwnProperty(props.button.toString())) {
+                            const newButton = {
+                                [props.button]: null,
+                            };
+                            setButtons(newButton);
                         }
                     }}
                 >
-                    {props.customDice && !props.customDice.removed ? getDicePreview() : <AddSvg />}
+                    x
                 </button>
-            </Tippy>
-            {addCustom ? (
-                <div className={"add-custom-dice"}>
-                    {!room?.disableDiceRoller ? (
-                        <div className={`setting dice-theme valid searching`}>
-                            <Select
-                                options={
-                                    !isNull(themes)
-                                        ? themes.map((t) => {
-                                              return { value: t.id, name: t.name || t.id, icon: getThemePreview(t) };
-                                          })
-                                        : []
-                                }
-                                current={{
-                                    value: currentCustomTheme?.id || theme?.id || "",
-                                    name: currentCustomTheme?.name || theme?.name || "",
-                                    icon: currentCustomTheme
-                                        ? getThemePreview(currentCustomTheme)
-                                        : theme
-                                          ? getThemePreview(theme)
-                                          : undefined,
-                                }}
-                                setTheme={setCustomTheme}
-                            />
-                        </div>
-                    ) : null}
-                    <div className={"dice-equation"}>
-                        <input
-                            ref={inputRef}
-                            type={"text"}
-                            onChange={(e) => {
-                                const value = e.currentTarget.value;
-                                try {
-                                    if (currentCustomTheme && !room?.disableDiceRoller) {
-                                        const parsed = parseRollEquation(value, currentCustomTheme);
-                                        if (parsed) {
-                                            setValidCustom(true);
-                                            inputRef.current?.classList.remove("error");
-                                            inputRef.current?.classList.add("success");
-                                        }
-                                    } else {
-                                        const roll = new DiceRoll(value);
-                                        if (roll) {
-                                            setValidCustom(true);
-                                            inputRef.current?.classList.remove("error");
-                                            inputRef.current?.classList.add("success");
-                                        }
-                                    }
-                                } catch {
-                                    setValidCustom(false);
-                                    inputRef.current?.classList.remove("success");
-                                    inputRef.current?.classList.add("error");
-                                }
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" && validCustom) {
-                                    const newButton = {
-                                        [props.button]: {
-                                            dice: e.currentTarget.value,
-                                            theme: currentCustomTheme
-                                                ? currentCustomTheme.id
-                                                : theme
-                                                  ? theme.id
-                                                  : "dddice-bees",
-                                        },
-                                    };
-                                    setButtons(newButton);
-                                    setAddCustom(false);
-                                    setValidCustom(false);
-                                } else if (e.key === "Escape") {
-                                    setAddCustom(false);
-                                }
-                            }}
-                        />
-                        <button
-                            className={"save-custom-dice"}
-                            disabled={!validCustom}
-                            onClick={() => {
-                                if (inputRef.current) {
-                                    const newButton = {
-                                        [props.button]: {
-                                            dice: inputRef.current.value,
-                                            theme: currentCustomTheme
-                                                ? currentCustomTheme.id
-                                                : theme
-                                                  ? theme.id
-                                                  : "dddice-bees",
-                                        },
-                                    };
-                                    setButtons(newButton);
-                                    setAddCustom(false);
-                                    setValidCustom(false);
-                                }
-                            }}
-                        >
-                            √
-                        </button>
-                        <button
-                            className={"abort-custom-dice"}
-                            onClick={() => {
-                                setAddCustom(false);
-                            }}
-                        >
-                            X
-                        </button>
-                    </div>
-                </div>
-            ) : null}
-            {props.customDice && !props.customDice.removed ? (
-                <>
-                    <button
-                        className={`hidden-roll self ${hover ? "hover" : ""}`}
-                        onClick={(e) => {
-                            if (e.currentTarget.parentElement) {
-                                roll(e.currentTarget.parentElement as HTMLButtonElement, !defaultHidden);
-                            }
-                        }}
-                    >
-                        {defaultHidden ? "SHOW" : "HIDE"}
-                    </button>
-                    <button
-                        className={`remove-dice ${hover ? "hover" : ""}`}
-                        onClick={() => {
-                            if (
-                                props.customDice &&
-                                !props.customDice.removed &&
-                                buttons.hasOwnProperty(String(props.button))
-                            ) {
-                                const newButton = {
-                                    [props.button]: { ...props.customDice, removed: true },
-                                };
-                                setButtons(newButton);
-                            }
-                        }}
-                    >
-                        x
-                    </button>
-                </>
             ) : null}
         </div>
     );
@@ -329,11 +253,8 @@ const CustomDiceButton = (props: CustomDiceButtonProps) => {
 const QuickButtons = ({ open }: { open: boolean }) => {
     const { theme, rollerApi } = useDiceRoller();
     const addRoll = useRollLogContext((state) => state.addRoll);
-    const [room, taSettings] = useMetadataContext((state) => [state.room, state.taSettings]);
+    const { room } = useMetadataContext();
     const [validCustom, setValidCustom] = useState<boolean>(true);
-    const playerContext = usePlayerContext();
-
-    const defaultHidden = playerContext.role === "GM" && !!taSettings.gm_rolls_hidden;
 
     const roll = async (element: HTMLElement, dice: string, hide: boolean = false) => {
         element.classList.add("rolling");
@@ -356,27 +277,30 @@ const QuickButtons = ({ open }: { open: boolean }) => {
     const getDiceList = () => {
         const DiceListEntry = ({ preview, name }: { preview: ReactNode; name: string }) => {
             return (
-                <Tippy content={name}>
-                    <li
-                        className={"quick-roll"}
+                <li
+                    className={"quick-roll"}
+                    onClick={async (e) => {
+                        await roll(e.currentTarget, name);
+                    }}
+                    ref={(e) => {
+                        if (e) {
+                            tippy(e, { content: name });
+                        }
+                    }}
+                >
+                    <div className={"quick-preview"}>{preview}</div>
+                    <button
+                        className={"self"}
                         onClick={async (e) => {
-                            await roll(e.currentTarget, name, defaultHidden);
+                            e.stopPropagation();
+                            if (e.currentTarget.parentElement) {
+                                await roll(e.currentTarget.parentElement, name, true);
+                            }
                         }}
                     >
-                        <div className={"quick-preview"}>{preview}</div>
-                        <button
-                            className={"self"}
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                if (e.currentTarget.parentElement) {
-                                    await roll(e.currentTarget.parentElement, name, !defaultHidden);
-                                }
-                            }}
-                        >
-                            {defaultHidden ? "SHOW" : "HIDE"}
-                        </button>
-                    </li>
-                </Tippy>
+                        SELF
+                    </button>
+                </li>
             );
         };
 
@@ -398,7 +322,7 @@ const QuickButtons = ({ open }: { open: boolean }) => {
                         name = (die as IAvailableDie).notation ?? (die as IAvailableDie).id;
                     } else {
                         preview = theme.preview[die as IDieType];
-                        name = String(die);
+                        name = die.toString();
                     }
                     if (name) {
                         name = name === "d10x" ? "d100" : name;
@@ -441,7 +365,7 @@ const QuickButtons = ({ open }: { open: boolean }) => {
                                 return;
                             }
                             try {
-                                if (theme && !room?.disableDiceRoller) {
+                                if (theme) {
                                     const parsed = parseRollEquation(e.currentTarget.value, theme.id);
                                     if (parsed) {
                                         setValidCustom(true);
@@ -471,46 +395,41 @@ const QuickButtons = ({ open }: { open: boolean }) => {
 };
 
 export const DiceRoomButtons = (props: DiceRoomButtonsProps) => {
-    const { buttons, setButtons } = useDiceButtonsContext();
+    const { buttons } = useDiceButtonsContext();
     const [quick, setQuick] = useState<boolean>(false);
-
-    useEffect(() => {
-        // In older version the value was only a string, we need to delete those buttons
-        if (buttons) {
-            Object.entries(buttons).forEach(([k, v]) => {
-                if (v && isString(v)) {
-                    setButtons({ [k]: null });
-                }
-            });
-        }
-    }, [buttons]);
 
     return (
         <div className={"dice-room-buttons"}>
             {Object.values(buttons).map((value, index) => {
-                return <CustomDiceButton key={index} button={index + 1} customDice={value} />;
+                return <CustomDiceButton key={index} button={index + 1} dice={value} />;
             })}
-            <Tippy content={"Log & Settings"}>
-                <button
-                    className={`open-dice-tray button icon ${props.open ? "open" : "closed"}`}
-                    onClick={(e) => {
-                        props.setOpen(!props.open);
-                        e.currentTarget.blur();
-                    }}
-                >
-                    <RollLogSvg />
-                </button>
-            </Tippy>
+            <button
+                className={`open-dice-tray button icon ${props.open ? "open" : "closed"}`}
+                ref={(e) => {
+                    if (e) {
+                        tippy(e, { content: "Log & Settings" });
+                    }
+                }}
+                onClick={(e) => {
+                    props.setOpen(!props.open);
+                    e.currentTarget.blur();
+                }}
+            >
+                <RollLogSvg />
+            </button>
             <div className={`quick-button-wrapper`}>
                 <QuickButtons open={quick} />
-                <Tippy content={"Quick roll"}>
-                    <button
-                        onClick={() => setQuick(!quick)}
-                        className={`quick-roll-button button icon ${quick ? "open" : ""}`}
-                    >
-                        <DiceSvg />
-                    </button>
-                </Tippy>
+                <button
+                    onClick={() => setQuick(!quick)}
+                    className={`quick-roll-button button icon ${quick ? "open" : ""}`}
+                    ref={(e) => {
+                        if (e) {
+                            tippy(e, { content: "Quick roll" });
+                        }
+                    }}
+                >
+                    <DiceSvg />
+                </button>
             </div>
         </div>
     );

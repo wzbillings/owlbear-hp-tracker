@@ -1,52 +1,6 @@
-# 3.0.0
-
-## HP Tracker is now Game Masters's Grimoire
-
-<center>
-  <img alt="GMG" src="https://raw.githubusercontent.com/kamejosh/owlbear-hp-tracker/feature/new-token-view/public/GMG.svg" width="50%" />
-</center>
-
-There is so much more than just HP Tracking going on. It's a complete toolkit for Dungeon and Game Masters so the renaming was something that had to be done to reflect the state of the extension
-
-[Check out the Tutorial](https://youtu.be/uEWr6qooAK8)
-
-+ There is a completely new Design for the token list 
-  + It aims to simplify the core functionality and make everything accessible with a click
-  + It comes with lots of tooltips to make it easier to know what things do and a lot more visual feedback what the current state is
-+ Token Preview in the token list (including mode that shows what players see)
-+ Dedicated map buttons that add HP or AC to the map and make them visible for players (right click or long press)
-+ Initiative Bonus can now be directly set in the token list (and is visible in the roll button)
-+ Tokens can now be assigned to players directly 
-+ Short and Long Rest buttons that heal and reset limited statblock abilities.
-+ Battle Round tracking (finally) that allows to keep track of who's turn it is across different groups with the click of a button
-+ Code optimization for better performance
-+ Statblock Popover now allows collapsing of statblocks for a better overview
-+ Statblock Popover can now be opened directly from the token list
-+ In Scene indicator whose turn it currently is
-+ Custom Dice can now use themes not matching a full DnD set
-+ Statblock Popover button is bigger and now toggles visibility of statblock popover
-+ Add setting in Tabletop Almanac to hide GM rolls by default
-+ And a few bug fixes along the way
-
-# 2.3.1
-
-+ Improve dddice Integration
-  + dddice dice box is automatically assigned to custom dice buttons if custom dice buttons have no value assigned
-  + custom dice buttons can now be set to use a different dice theme than the main dice theme
-  + you can now switch dddice rooms directly from the Dice Settings
-+ Fix crash when token data breaks
-+ Add Critical Rolls to Damage Rolls for 5e and PF2
-
 # 2.3.0
 
 + Add limited abilities to custom statblocks: [video](https://www.youtube.com/watch?v=injiQlxv5Fc)
-+ Add new Spell and Statblock Fields from TA to HP Tracker
-+ Fix some bugs
-+ Token Owners are always able to access statblock an change stats
-+ Fix issue when minimizing statblock popover
-+ Give statblocks of owned tokens a border in the player color
-+ make statblock name sticky
-+ Fix HP Tracker showing hidden rolls from dddice
 
 # 2.2.1
 

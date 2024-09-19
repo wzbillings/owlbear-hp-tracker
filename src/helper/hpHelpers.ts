@@ -32,7 +32,6 @@ export const createBar = async (percentage: number, tempHpPercentage: number, to
         .attachedTo(token.id)
         .layer("ATTACHMENT")
         .locked(true)
-        .disableHit(true)
         .disableAttachmentBehavior(["ROTATION"])
         .visible(token.visible)
         .build();
@@ -49,7 +48,6 @@ export const createBar = async (percentage: number, tempHpPercentage: number, to
         .attachedTo(token.id)
         .layer("ATTACHMENT")
         .locked(true)
-        .disableHit(true)
         .name("hp")
         .disableAttachmentBehavior(["ROTATION"])
         .visible(token.visible)
@@ -67,7 +65,6 @@ export const createBar = async (percentage: number, tempHpPercentage: number, to
         .attachedTo(token.id)
         .layer("ATTACHMENT")
         .locked(true)
-        .disableHit(true)
         .name("temp-hp")
         .disableAttachmentBehavior(["ROTATION"])
         .visible(token.visible)
@@ -91,20 +88,18 @@ const createText = async (text: string, token: Image) => {
     const textItem = buildText()
         .textType("PLAIN")
         .width(width)
-        .height(height)
-        .position({ ...position, y: position.y + height * 0.1 }) // remove the height * 0.1 modifier once the new rendering engine is released
+        .height(height * 0.8) // because of text lines leaving space below we have to move it to the middle manually
+        .position({ ...position, y: position.y + height * 0.2 })
         .attachedTo(token.id)
         .plainText(text)
         .locked(true)
         .textAlign("CENTER")
-        .textAlignVertical("BOTTOM")
+        .textAlignVertical("MIDDLE")
         .fontWeight(600)
         .fillColor("white")
         .strokeColor("black")
         .strokeWidth(height / 30)
-        .fontSize(height)
-        .lineHeight(1)
-        .disableHit(true)
+        .fontSize(height * 0.8)
         .disableAttachmentBehavior(["ROTATION", "VISIBLE"])
         .visible(token.visible)
         .name("hp-text")
@@ -136,7 +131,7 @@ const handleHpOffsetUpdate = async (offset: number, hp: Item) => {
             } else if (hp.name === "hp-text") {
                 change.position = {
                     x: x + 2,
-                    y: bounds.position.y + bounds.height - height + offset + height * 0.1,
+                    y: bounds.position.y + bounds.height - height + offset + height * 0.2,
                 };
             } else {
                 change.position = {
@@ -154,13 +149,13 @@ export const updateHpOffset = async (offset: number) => {
         (item) =>
             item.type === "SHAPE" &&
             infoMetadataKey in item.metadata &&
-            (item.metadata[infoMetadataKey] as AttachmentMetadata).attachmentType === "BAR",
+            (item.metadata[infoMetadataKey] as AttachmentMetadata).attachmentType === "BAR"
     );
     const hpTexts = await OBR.scene.items.getItems(
         (item) =>
             item.type === "TEXT" &&
             infoMetadataKey in item.metadata &&
-            (item.metadata[infoMetadataKey] as AttachmentMetadata).attachmentType === "HP",
+            (item.metadata[infoMetadataKey] as AttachmentMetadata).attachmentType === "HP"
     );
     const barChanges = new Map<string, BarItemChanges>();
     const textChanges = new Map<string, TextItemChanges>();
@@ -237,7 +232,7 @@ export const updateBarChanges = async (changes: Map<string, BarItemChanges>) => 
                         }
                     }
                 });
-            },
+            }
         );
     }
 };
@@ -263,7 +258,7 @@ export const updateTextChanges = async (changes: Map<string, TextItemChanges>) =
                         }
                     }
                 });
-            },
+            }
         );
     }
 };
@@ -272,7 +267,7 @@ export const saveOrChangeBar = async (
     character: Item,
     data: HpTrackerMetadata,
     attachments: Item[],
-    shapeChanges: Map<string, BarItemChanges>,
+    shapeChanges: Map<string, BarItemChanges>
 ) => {
     if (attachments.length > 0) {
         for (const a of attachments) {
@@ -292,7 +287,7 @@ export const saveOrChangeText = async (
     character: Item,
     data: HpTrackerMetadata,
     attachments: Array<Item>,
-    textChanges: Map<string, TextItemChanges>,
+    textChanges: Map<string, TextItemChanges>
 ) => {
     const hpText = `${data.hp}/${data.maxHp}${!!data.stats.tempHp ? "(" + data.stats.tempHp + ")" : ""}`;
     if (attachments.length > 0) {
@@ -301,8 +296,8 @@ export const saveOrChangeText = async (
             if ((a as Text).text.plainText !== hpText) {
                 change.text = hpText;
             }
-            if (a.visible !== (character.visible && !!data.playerMap?.hp)) {
-                change.visible = character.visible && !!data.playerMap?.hp;
+            if (a.visible !== (character.visible && data.canPlayersSee)) {
+                change.visible = character.visible && data.canPlayersSee;
             }
             if (!!change.text || change.visible !== undefined) {
                 textChanges.set(a.id, change);
@@ -310,7 +305,7 @@ export const saveOrChangeText = async (
         }
     } else {
         const text = await createText(hpText, character as Image);
-        text.visible = character.visible && !!data.playerMap?.hp;
+        text.visible = character.visible && data.canPlayersSee;
         await OBR.scene.items.addItems([text]);
     }
 };
@@ -319,7 +314,7 @@ const handleBarAttachment = async (
     attachment: Item,
     character: Image,
     changeMap: Map<string, BarItemChanges>,
-    data: HpTrackerMetadata,
+    data: HpTrackerMetadata
 ): Promise<BarItemChanges> => {
     const shape = attachment as Shape;
     const bounds = await getImageBounds(character);
@@ -377,8 +372,8 @@ export const updateTextVisibility = async (tokens: Array<Item>) => {
 
         textAttachments.forEach((text) => {
             const change = textChanges.get(text.id) ?? {};
-            if (text.visible != (token.visible && !!data.playerMap?.hp)) {
-                change.visible = token.visible && !!data.playerMap?.hp;
+            if (text.visible != (token.visible && data.canPlayersSee)) {
+                change.visible = token.visible && data.canPlayersSee;
                 textChanges.set(text.id, change);
             }
         });
